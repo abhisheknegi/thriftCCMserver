@@ -32,15 +32,20 @@ public class ccmServerDefinition {
 
 		ccmServerEventHandler cse = new ccmServerEventHandler();
 		server.setServerEventHandler(cse);
-		
+
 		server.serve();
 	}
 
-	//public static void main() throws TTransportException {
-	public static void notMain(String[] args) throws TTransportException {
-		String env = args[0];
-		Integer port = Integer.valueOf(args[1]);
-		start(initializeAllConfigs(env), env, port);
+	public static void main(String[] args) throws TTransportException {
+		// public static void notMain(String[] args) throws TTransportException {
+		if (args.length > 0) {
+			String env = args[0];
+			Integer port = Integer.valueOf(args[1]);
+			start(initializeAllConfigs(env), env, port);
+		} else {
+			System.out.println("ERROR: Required input not present....processing exiting.\n");
+			Runtime.getRuntime().exit(-1);
+		}
 	}
 
 	public static dataClass initializeAllConfigs(String env) {
@@ -105,14 +110,18 @@ public class ccmServerDefinition {
 
 	public static class ccmServerContext implements ServerContext {
 		int connectionId = 0;
+
 		public ccmServerContext() {
 		}
+
 		public ccmServerContext(int connectionId, String type) {
 			this.connectionId = connectionId;
 		}
+
 		public int getConnectionId() {
 			return connectionId;
 		}
+
 		public void setConnectionId(int connectionId) {
 			this.connectionId = connectionId;
 		}
@@ -120,10 +129,12 @@ public class ccmServerDefinition {
 
 	public static class ccmServerEventHandler implements TServerEventHandler {
 		private int id = 0;
+
 		public void preServe() {
 			System.out.println(
 					"TServerEventHandler.preServe - called only once before server starts accepting connections");
 		}
+
 		public ServerContext createContext(TProtocol input, TProtocol output) {
 			ccmServerContext ctx = new ccmServerContext();
 			id++;
@@ -131,10 +142,12 @@ public class ccmServerDefinition {
 			System.out.println("New connection #" + ctx.getConnectionId() + " established");
 			return ctx;
 		}
+
 		public void deleteContext(ServerContext serverContext, TProtocol input, TProtocol output) {
 			ccmServerContext ctx = (ccmServerContext) serverContext;
 			System.out.println("Connection #" + ctx.getConnectionId() + " terminated");
 		}
+
 		public void processContext(ServerContext serverContext, TTransport inputTransport, TTransport outputTransport) {
 			ccmServerContext ctx = (ccmServerContext) serverContext;
 			System.out.println("Request processed for connection # " + ctx.getConnectionId());
