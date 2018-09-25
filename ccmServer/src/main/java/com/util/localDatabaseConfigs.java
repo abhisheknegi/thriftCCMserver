@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 public class localDatabaseConfigs {
-	
+
 	private String env = null;
 	private Connection connect = null;
 	private PreparedStatement ps0 = null;
@@ -30,22 +30,25 @@ public class localDatabaseConfigs {
 	protected void createTable() throws SQLException {
 		Statement statement = connect.createStatement();
 		statement.setQueryTimeout(5);
-		statement.executeUpdate("drop table if exists configs");
 		statement.execute(
-				"create table configs (type string, group1 string, key string, value string, PRIMARY KEY (type, key)");
+				"create table if not exists configs (type string, group1 string, key string, value string, PRIMARY KEY (type, key))");
 		statement.close();
 	}
 
 	public void setRecord(dbDataObject data) {
 		try {
-			if(ps0 == null) {
+			if (ps0 == null) {
 				String sql = "insert into configs values(?,?,?,?)";
 				ps0 = connect.prepareStatement(sql);
 			}
 			ps0.setString(1, data.getType());
-			if(data.getGroup() == null) {
+			if (data.getGroup() == null) {
 				String[] st = data.getKey().split("\\.");
-				data.setGroup(st[0]+"."+st[1]);
+				if (st.length > 1) {
+					data.setGroup(st[0] + "." + st[1]);
+				} else {
+					data.setGroup(data.getKey());
+				}
 			}
 			ps0.setString(2, data.getGroup());
 			ps0.setString(3, data.getKey());
@@ -54,16 +57,17 @@ public class localDatabaseConfigs {
 			connect.commit();
 		} catch (SQLException e) {
 			clearDbMessage();
-			System.out.println("Error Code => " + e.getErrorCode() + " :: " + e.getMessage() + ", => Triggering Update.");
+			System.out
+					.println("Error Code => " + e.getErrorCode() + " :: " + e.getSQLState() + ", => Triggering Update.");
 			updateRecord(data);
 		} catch (Exception ex) {
 			ex.printStackTrace();
 		}
 	}
-	
+
 	public void updateRecord(dbDataObject data) {
 		try {
-			if(ps6 == null) {
+			if (ps6 == null) {
 				String sql = "update configs set value = ? where type = ? and key = ?";
 				ps6 = connect.prepareStatement(sql);
 			}
@@ -71,8 +75,13 @@ public class localDatabaseConfigs {
 			ps6.setString(2, data.getType());
 			ps6.setString(3, data.getKey());
 			int i = ps6.executeUpdate();
-			System.out.println("Update Successful, Code: " + i);
-			connect.commit();
+			if (i == 1) {
+				System.out.println("Update Successful, committing.");
+				connect.commit();
+			}else {
+				System.out.println("ERROR in Updation, issuing rollback. Code = " + i);
+				connect.rollback();
+			}
 		} catch (Exception e) {
 			clearDbMessage();
 			System.out.println("Error => " + e.getMessage());
@@ -83,8 +92,8 @@ public class localDatabaseConfigs {
 	public String getSingleValue(String type, String key) {
 		try {
 			String resp = null;
-			if(ps1 == null) {
-				ps1 = connect.prepareStatement("select * from configs where type = ? and key = ?");
+			if (ps1 == null) {
+				ps1 = connect.prepareStatement("select value from configs where type = ? and key = ?");
 			}
 			ps1.setString(1, type);
 			ps1.setString(2, key);
@@ -105,14 +114,14 @@ public class localDatabaseConfigs {
 	public Map<String, String> getGroupValues(String type, String group) {
 		try {
 			Map<String, String> resp = new HashMap<>();
-			if(ps2 == null) {
-				ps2 = connect.prepareStatement("select * from configs where type = ? and group1 = ?");
+			if (ps2 == null) {
+				ps2 = connect.prepareStatement("select key, value from configs where type = ? and group1 = ?");
 			}
 			ps2.setString(1, type);
 			ps2.setString(2, group);
 			ResultSet rs = ps2.executeQuery();
 			while (rs.next()) {
-				resp.put(rs.getString("key"), rs.getString("value"));
+				resp.put(rs.getString("key").replace(group + ".", ""), rs.getString("value"));
 			}
 			rs.close();
 			return resp;
@@ -123,12 +132,12 @@ public class localDatabaseConfigs {
 			return null;
 		}
 	}
-	
+
 	public Map<String, String> getAllValues(String type) {
 		try {
 			Map<String, String> resp = new HashMap<>();
-			if(ps3 == null) {
-				ps3 = connect.prepareStatement("select * from configs where type =?");
+			if (ps3 == null) {
+				ps3 = connect.prepareStatement("select key, value from configs where type =?");
 			}
 			ps3.setString(1, type);
 			ResultSet rs = ps3.executeQuery();
@@ -144,11 +153,11 @@ public class localDatabaseConfigs {
 			return null;
 		}
 	}
-	
-	public List<String> getTypes(){
+
+	public List<String> getTypes() {
 		try {
 			List<String> resp = new ArrayList<>();
-			if(ps4 == null) {
+			if (ps4 == null) {
 				String sql = "select type from configs";
 				ps4 = connect.prepareStatement(sql);
 			}
@@ -165,11 +174,11 @@ public class localDatabaseConfigs {
 			return null;
 		}
 	}
-	
-	public List<String> getGroups(String type){
+
+	public List<String> getGroups(String type) {
 		try {
 			List<String> resp = new ArrayList<>();
-			if(ps5 == null) {
+			if (ps5 == null) {
 				ps5 = connect.prepareStatement("select group1 from configs where type = ?");
 			}
 			ps5.setString(1, type);
@@ -190,11 +199,12 @@ public class localDatabaseConfigs {
 	public Connection getDbConnection() throws SQLException {
 
 		if (connect == null || connect.isClosed()) {
-			String conn = "jdbc:sqlite:/Users/vn0bp7s/sqlite_db/" + this.env + ".db";
+			String conn = "jdbc:sqlite:/app/pna/ccm/ccm_db/" + this.env + ".db";
 			try {
 				Class.forName("org.sqlite.JDBC");
 				this.connect = DriverManager.getConnection(conn);
 				this.connect.setAutoCommit(true);
+				createTable();
 			} catch (Exception e) {
 				clearDbMessage();
 				System.out.println("Error => " + e.getMessage());
@@ -204,10 +214,11 @@ public class localDatabaseConfigs {
 		this.connect.setAutoCommit(false);
 		return this.connect;
 	}
-	
+
 	private void clearDbMessage() {
 		try {
 			connect.clearWarnings();
+			connect.rollback();
 		} catch (SQLException e) {
 			e.printStackTrace();
 		}
