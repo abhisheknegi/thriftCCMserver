@@ -18,7 +18,7 @@ public class ccmClient {
 
 	public ccmProviderService.Client getClient() throws InvalidOperationException, TException, InterruptedException {
 		if (client == null || !client.ping()) {
-			TTransport transport = new TFramedTransport(new TSocket("10.118.70.189", 8092));
+			TTransport transport = new TFramedTransport(new TSocket("localhost", 9090));
 			TProtocol protocol = new TBinaryProtocol(transport);
 			this.client = new ccmProviderService.Client(protocol);
 			transport.open();

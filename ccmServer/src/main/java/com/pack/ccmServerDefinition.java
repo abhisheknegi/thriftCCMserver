@@ -1,8 +1,7 @@
 package com.pack;
 
-import java.io.File;
-import java.util.HashMap;
-import java.util.Map;
+import java.sql.Connection;
+import java.sql.SQLException;
 
 import org.apache.thrift.protocol.TProtocol;
 import org.apache.thrift.server.ServerContext;
@@ -15,17 +14,16 @@ import org.apache.thrift.transport.TTransport;
 import org.apache.thrift.transport.TTransportException;
 
 import com.pack.ccmProviderService.Processor;
-import com.typesafe.config.Config;
-import com.typesafe.config.ConfigFactory;
+import com.util.localDatabaseConfigs;
 
 public class ccmServerDefinition {
 
-	public static void start(dataClass configData, String env, int port) throws TTransportException {
+	public static void start(localDatabaseConfigs conf, int port) throws TTransportException {
 
 		TNonblockingServerTransport transport = new TNonblockingServerSocket(port);
 		TNonblockingServer.Args nBlockServer = new TNonblockingServer.Args(transport);
 
-		ccmProviderServiceImpl impl = new ccmProviderServiceImpl(configData, env);
+		ccmProviderServiceImpl impl = new ccmProviderServiceImpl(conf);
 		Processor<ccmProviderServiceImpl> processor = new ccmProviderService.Processor<>(impl);
 
 		TServer server = new TNonblockingServer(nBlockServer.processor(processor));
@@ -36,92 +34,37 @@ public class ccmServerDefinition {
 		server.serve();
 	}
 
-	public static void main(String[] args) throws TTransportException {
-		// public static void notMain(String[] args) throws TTransportException {
-		if (args.length > 0) {
-			String env = args[0];
-			Integer port = Integer.valueOf(args[1]);
-			start(initializeAllConfigs(env), env, port);
+	public static void main(String[] args) throws TTransportException, SQLException {
+		if (args.length > 1) {
+			start(setupDbConnection(args[0]), Integer.valueOf(args[1]));
 		} else {
-			System.out.println("ERROR: Required input not present....processing exiting.\n");
+			System.out.println("ERROR: Required input not present....processing exiting.");
 			Runtime.getRuntime().exit(-1);
 		}
 	}
 
-	public static dataClass initializeAllConfigs(String env) {
-		String folder = "/app/pna/ccm/" + env + "/";
-		String configs = "config_offer.json," + "config_price.json," + "config_seller.json," + "config_avail.json,"
-				+ "config_logging.json," + "config_rank.json";
-
-		Map<String, Map<String, String>> directMaster = new HashMap<>();
-		Map<String, Map<String, Map<String, String>>> groupMaster = new HashMap<>();
-
-		for (String config : configs.split(",")) {
-			File file = new File(folder + config);
-			if (file.exists()) {
-				directMaster.put(config.split("\\.")[0], directReferenceConfigs(config, file));
-				groupMaster.put(config.split("\\.")[0], groupReferenceConfigs(config, file));
-			} else {
-				System.out.println("File doesn't exist...");
-			}
+	public static localDatabaseConfigs setupDbConnection(String env) throws SQLException {
+		localDatabaseConfigs conf = new localDatabaseConfigs(env);
+		Connection conn = conf.getDbConnection();
+		if(!conn.isClosed()) {
+			return conf;
+		}else {
+			System.out.println("ERROR: Check DB Connection....processing exiting.");
+			Runtime.getRuntime().exit(-1);
+			return null;
 		}
-
-		dataClass response = new dataClass();
-		response.setDirectMaster(directMaster);
-		response.setGroupMaster(groupMaster);
-		return response;
-	}
-
-	public static Map<String, String> directReferenceConfigs(String config, File file) {
-
-		Config fromFile = ConfigFactory.parseFile(new File(file.getPath()));
-		Map<String, String> directChild = new HashMap<>();
-		fromFile.entrySet().forEach(rec -> {
-			directChild.put(rec.getKey().replace("\"", ""), rec.getValue().render().replace("\"", ""));
-		});
-
-		return directChild;
-	}
-
-	public static Map<String, Map<String, String>> groupReferenceConfigs(String config, File file) {
-
-		Config fromFile = ConfigFactory.parseFile(new File(file.getPath()));
-		Map<String, Map<String, String>> groupChild = new HashMap<>();
-
-		fromFile.entrySet().forEach(rec -> {
-			if (rec.getKey().contains(".")) {
-				String[] keys = rec.getKey().replace("\"", "").split("\\.");
-				if (keys.length > 2) {
-					String groupId = keys[0] + "." + keys[1];
-					Map<String, String> values = new HashMap<>();
-					if (!groupChild.containsKey(groupId)) {
-						values = new HashMap<>();
-						groupChild.put(groupId, values);
-					} else {
-						values = groupChild.get(groupId);
-					}
-					String key = rec.getKey().replace("\"", "").replace((keys[0] + "." + keys[1] + "."), "");
-					values.put(key, rec.getValue().render().replaceAll("\"", ""));
-				}
-			}
-		});
-		return groupChild;
 	}
 
 	public static class ccmServerContext implements ServerContext {
 		int connectionId = 0;
-
 		public ccmServerContext() {
 		}
-
 		public ccmServerContext(int connectionId, String type) {
 			this.connectionId = connectionId;
 		}
-
 		public int getConnectionId() {
 			return connectionId;
 		}
-
 		public void setConnectionId(int connectionId) {
 			this.connectionId = connectionId;
 		}
@@ -149,8 +92,8 @@ public class ccmServerDefinition {
 		}
 
 		public void processContext(ServerContext serverContext, TTransport inputTransport, TTransport outputTransport) {
-			ccmServerContext ctx = (ccmServerContext) serverContext;
-			System.out.println("Request processed for connection # " + ctx.getConnectionId());
+			//ccmServerContext ctx = (ccmServerContext) serverContext;
+			//System.out.println("Request processed for connection # " + ctx.getConnectionId());
 		}
 	}
 }

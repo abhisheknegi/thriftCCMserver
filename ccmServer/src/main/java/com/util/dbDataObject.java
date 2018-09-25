@@ -2,21 +2,30 @@ package com.util;
 
 public class dbDataObject {
 	
-	private String type;
-	private String group1;
-	private String key;
-	private String value;
+	private String type = null;
+	private String group = null;
+	private String key = null;
+	private String value = null;
+	
+	public dbDataObject(String type, String group, String key, String value) {
+		this.type = type;
+		this.group = group;
+		this.key = key;
+		this.value = value;
+	}
+	public dbDataObject() {
+	}
 	public String getType() {
 		return type;
 	}
 	public void setType(String type) {
 		this.type = type;
 	}
-	public String getGroup1() {
-		return group1;
+	public String getGroup() {
+		return group;
 	}
-	public void setGroup1(String group1) {
-		this.group1 = group1;
+	public void setGroup(String group) {
+		this.group = group;
 	}
 	public String getKey() {
 		return key;
